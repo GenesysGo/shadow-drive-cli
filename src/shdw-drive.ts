@@ -23,7 +23,7 @@ import {
 import cliProgress from "cli-progress";
 import { ShadowDriveResponse, ShdwDrive } from "@shadow-drive/sdk";
 
-program.version("0.2.2");
+program.version("0.3.0");
 program.description(
     "CLI for interacting with Shade Drive. This tool uses Solana's Mainnet-Beta network with an internal RPC configuration. It does not use your local Solana configurations."
 );
