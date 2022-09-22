@@ -318,7 +318,10 @@ async function handleUpload(
         );
         fileData.push({
             name: fileName,
-            file: fs.readFileSync(path.resolve(options.directory, fileName)),
+            file:
+                mode === "directory"
+                    ? fs.readFileSync(path.resolve(options.directory, fileName))
+                    : fs.readFileSync(path.resolve(file)),
             url,
         });
     });
