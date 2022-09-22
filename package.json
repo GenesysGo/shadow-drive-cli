@@ -1,6 +1,6 @@
 {
     "name": "@shadow-drive/cli",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "main": "shdw-drive.js",
     "bin": {
         "shdw-drive": "./dist/shdw-drive.js"
