@@ -17,6 +17,7 @@ import {
     getStorageConfigPDA,
     humanSizeToBytes,
     loadWalletKey,
+    parseScientific,
     sortByProperty,
     validateStorageAccount,
 } from "./helpers";
@@ -104,8 +105,10 @@ programCommand("create-storage-account")
         const accountCostEstimate = storageInputBigInt
             .mul(shadesPerGib)
             .div(bytesPerGib);
-        const accountCostUiAmount = accountCostEstimate.toNumber() / 10 ** 9;
-        // log.info(`This account will require ${accountCostEstimate} SHDW to setup`);
+        const accountCostUiAmount = parseScientific(
+            (accountCostEstimate / new anchor.BN(10 ** 9)).toString()
+        );
+
         const confirmStorageCost = await prompts({
             type: "confirm",
             name: "acceptStorageCost",
