@@ -22,6 +22,9 @@ import {
 } from "./helpers";
 import cliProgress from "cli-progress";
 import { ShadowDriveResponse, ShdwDrive } from "@shadow-drive/sdk";
+import { from, map, mergeMap, tap, toArray } from "rxjs";
+
+import mime from "mime-types";
 
 program.version("0.3.2");
 program.description(
@@ -311,17 +314,27 @@ async function handleUpload(
     }
     const fileSpinner = ora("Collecting all files").start();
     let fileData: any = [];
+    let tmpFileData: any = [];
     filesToRead.forEach((file) => {
         const fileName = file.substring(file.lastIndexOf("/") + 1);
+        const filePath =
+            mode === "directory"
+                ? path.resolve(options.directory, fileName)
+                : path.resolve(file);
+        const fileStats = fs.statSync(filePath);
+        const fileExtension = fileName.substring(fileName.lastIndexOf(".") + 1);
+        const fileContentType = mime.lookup(fileExtension);
+        const size = new anchor.BN(fileStats.size);
         const url = encodeURI(
             `https://shdw-drive.genesysgo.net/{replace}/${fileName}`
         );
-        fileData.push({
-            name: fileName,
-            file:
-                mode === "directory"
-                    ? fs.readFileSync(path.resolve(options.directory, fileName))
-                    : fs.readFileSync(path.resolve(file)),
+        tmpFileData.push({
+            location: filePath,
+            fileName: fileName,
+            fileStats,
+            fileExtension,
+            contentType: fileContentType,
+            size,
             url,
         });
     });
@@ -399,13 +412,9 @@ async function handleUpload(
         return;
     }
 
-    fileData.forEach((file: any) => {
+    tmpFileData.forEach((file: any) => {
         file.url = file.url.replace("%7Breplace%7D", storageAccount.toString());
     });
-
-    // let existingFiles: any = [];
-
-    // fs.writeFileSync(programLogPath, JSON.stringify(existingFiles));
 
     // create new progress bar
     const progress = new cliProgress.SingleBar({
@@ -415,19 +424,106 @@ async function handleUpload(
         hideCursor: true,
     });
 
-    progress.start(fileData.length, 0);
+    const concurrent = options.concurrent ? parseInt(options.concurrent) : 3;
 
-    const uploadResponse = await drive.uploadMultipleFiles(
-        storageAccount,
-        fileData,
-        parseInt(options.concurrent),
-        (items: number) => {
-            progress.increment(items);
+    progress.start(tmpFileData.length, 0);
+
+    let chunks = [];
+    let indivChunk: any = [];
+
+    function getChunkLength(array1: any[], array2: any[]) {
+        let starting = array1.length;
+        if (array2.length) {
+            return array2.reduce(
+                (total, next) => (total += next.length),
+                starting
+            );
         }
-    );
-    progress.stop();
-    fs.writeFileSync(programLogPath, JSON.stringify(uploadResponse));
-    log.debug(uploadResponse);
+        return starting;
+    }
+
+    for (let chunkIdx = 0; chunkIdx < tmpFileData.length; chunkIdx++) {
+        if (indivChunk.length === 0) {
+            indivChunk.push(chunkIdx);
+            // Handle when a fresh individual chunk is equal to the file data's length
+            let allChunksSum = getChunkLength(indivChunk, chunks);
+            if (allChunksSum === tmpFileData.length) {
+                chunks.push(indivChunk);
+                continue;
+            }
+            continue;
+        }
+        if (indivChunk.length < 5) {
+            indivChunk.push(chunkIdx);
+            if (chunkIdx == tmpFileData.length - 1) {
+                chunks.push(indivChunk);
+                indivChunk = [];
+            }
+        } else {
+            chunks.push(indivChunk);
+            indivChunk = [chunkIdx];
+            let allChunksSum = getChunkLength(indivChunk, chunks);
+            if (allChunksSum === tmpFileData.length) {
+                chunks.push(indivChunk);
+                continue;
+            }
+        }
+    }
+
+    const appendFileToItem = (item: any) => {
+        const { fileName, ...props } = item;
+
+        const currentFilePath =
+            mode === "directory"
+                ? path.resolve(options.directory, fileName)
+                : options.file;
+        let data = fs.readFileSync(currentFilePath);
+        return {
+            ...props,
+            fileName,
+            data,
+        };
+    };
+
+    from(chunks)
+        .pipe(
+            // transform each chunk
+            map((indivChunk: number[]) => {
+                return indivChunk.map((index: number) =>
+                    appendFileToItem(tmpFileData[index])
+                );
+            }),
+            // resolve the resulting promises with concurrency
+            mergeMap(
+                async (items) => {
+                    let fileDataChunk: any = [];
+                    items.map((item) => {
+                        fileDataChunk.push({
+                            name: item.fileName,
+                            file: fs.readFileSync(item.location),
+                            url: item.url,
+                        });
+                    });
+                    const uploadResponse = await drive.uploadMultipleFiles(
+                        storageAccount,
+                        fileDataChunk,
+                        concurrent,
+                        (items: number) => progress.increment(items)
+                    );
+                    return uploadResponse;
+                },
+                tmpFileData.length > 1 ? concurrent : 1
+            ),
+            // zip them up into a flat array once all are done to get full result list
+            toArray(),
+            map((res) => res.flat())
+        )
+        .subscribe((results) => {
+            fs.writeFileSync(programLogPath, JSON.stringify(results));
+            progress.stop();
+            log.debug(results);
+            log.info(`${results.length} files uploaded.`);
+        });
 }
 programCommand("upload-multiple-files")
     .requiredOption(
