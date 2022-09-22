@@ -311,16 +311,23 @@ async function handleUpload(
     }
     const fileSpinner = ora("Collecting all files").start();
     let fileData: any = [];
+    let multipartFileData: any = [];
     filesToRead.forEach((file) => {
         const fileName = file.substring(file.lastIndexOf("/") + 1);
         const url = encodeURI(
             `https://shdw-drive.genesysgo.net/{replace}/${fileName}`
         );
-        fileData.push({
-            name: fileName,
-            file: fs.readFileSync(path.resolve(options.directory, fileName)),
-            url,
-        });
+        if (fs.statSync(path.resolve(file)).size >= 104_857_600) {
+            multipartFileData.push({ location: path.resolve(file) });
+        } else {
+            fileData.push({
+                name: fileName,
+                file: fs.readFileSync(
+                    path.resolve(options.directory, fileName)
+                ),
+                url,
+            });
+        }
     });
     fileSpinner.succeed();
 
@@ -414,17 +421,25 @@ async function handleUpload(
 
     progress.start(fileData.length, 0);
 
-    const uploadResponse = await drive.uploadMultipleFiles(
+    const uploadResponseMultipart = await drive.uploadMultipartFile(
         storageAccount,
-        fileData,
-        parseInt(options.concurrent),
+        multipartFileData[0].location,
         (items: number) => {
             progress.increment(items);
         }
     );
+
+    // const uploadResponse = await drive.uploadMultipleFiles(
+    //     storageAccount,
+    //     fileData,
+    //     parseInt(options.concurrent),
+    //     (items: number) => {
+    //         progress.increment(items);
+    //     }
+    // );
     progress.stop();
-    fs.writeFileSync(programLogPath, JSON.stringify(uploadResponse));
-    log.debug(uploadResponse);
+    // fs.writeFileSync(programLogPath, JSON.stringify(uploadResponse));
+    // log.debug(uploadResponse);
 }
 programCommand("upload-multiple-files")
     .requiredOption(
