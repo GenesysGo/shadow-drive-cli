@@ -770,6 +770,84 @@ programCommand("delete-storage-account")
         );
     });
 
+programCommand("migrate-storage-account")
+    .requiredOption(
+        "-kp, --keypair <string>",
+        "Path to wallet that owns the storage account"
+    )
+    .action(async (options, cmd) => {
+        const keypair = loadWalletKey(options.keypair);
+        const wallet = new anchor.Wallet(keypair);
+        const connection = new anchor.web3.Connection(options.rpc);
+        const drive = await new ShdwDrive(connection, wallet).init();
+
+        const userInfo = drive.userInfo;
+        const [programClient, provider] = getAnchorEnvironment(
+            keypair,
+            connection
+        );
+        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        if (userInfoAccount === null) {
+            return log.error(
+                "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
+            );
+        }
+
+        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
+
+        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
+        let [formattedAccounts] = await getFormattedStorageAccounts(
+            keypair.publicKey,
+            numberOfStorageAccounts
+        );
+        formattedAccounts = formattedAccounts.sort(
+            sortByProperty("accountCounterSeed")
+        );
+        formattedAccounts = formattedAccounts.filter(
+            (acc) => acc.version === "V1"
+        );
+
+        const pickedAccount = await prompts({
+            type: "select",
+            name: "option",
+            message: "Which storage account do you want to migrate?",
+            choices: formattedAccounts.map((acc: any) => {
+                return {
+                    title: `${acc.identifier} - ${acc.pubkey.toString()} - ${
+                        acc.storageAvailable
+                    } remaining - ${acc.immutable ? "Immutable" : "Mutable"}`,
+                    disabled: acc.immutable || acc.toBeDeleted,
+                };
+            }),
+        });
+
+        if (typeof pickedAccount.option === "undefined") {
+            log.error("You must pick a storage account to migrate.");
+            return;
+        }
+
+        // Get current storage and user funds
+        const storageAccount = formattedAccounts[pickedAccount.option].pubkey;
+        log.debug({
+            storageAccount: storageAccount.toString(),
+        });
+
+        const txnSpinner = ora(
+            "Sending storage account version migration request. Subject to solana traffic conditions (w/ 120s timeout)."
+        ).start();
+        try {
+            await drive.migrate(storageAccount);
+        } catch (e) {
+            txnSpinner.fail(
+                "Error sending transaction. Please see information below."
+            );
+            return log.error(e);
+        }
+        txnSpinner.succeed(
+            `Storage account version migration request successfully submitted for account ${storageAccount.toString()}. It is now a V2 Storage Account`
+        );
+    });
+
 programCommand("undelete-storage-account")
     .requiredOption(
         "-kp, --keypair <string>",
