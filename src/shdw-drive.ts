@@ -26,7 +26,7 @@ import { ShadowDriveResponse, ShdwDrive } from "@shadow-drive/sdk";
 import { from, map, mergeMap, tap, toArray } from "rxjs";
 import mime from "mime-types";
 
-program.version("0.3.4");
+program.version("0.3.5");
 program.description(
     "CLI for interacting with Shade Drive. This tool uses Solana's Mainnet-Beta network with an internal RPC configuration. It does not use your local Solana configurations."
 );
@@ -1506,7 +1506,7 @@ function programCommand(name: string) {
         .option(
             "-r, --rpc <string>",
             "Solana Mainnet RPC Endpoint",
-            "https://ssc-dao.genesysgo.net"
+            "https://api.mainnet-beta.solana.com"
         )
         .option("-l, --log-level <string>", "log level", setLogLevel);
 
