@@ -282,7 +282,7 @@ programCommand("edit-file")
             txnSpinner.succeed(`File account updated: ${fileName}`);
             log.info(
                 "Your finalized file location:",
-                uploadResponse.finalized_locations[0]
+                uploadResponse.finalized_location
             );
             log.info("Your updated file is immediately accessible.");
         } catch (e) {
