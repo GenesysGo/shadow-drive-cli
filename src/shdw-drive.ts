@@ -609,7 +609,7 @@ programCommand("delete-file")
                 options.url,
                 "v2"
             );
-            log.info(`Delete File transaction: ${deleteResponse.txid}`);
+            log.info(`File ${options.url} successfully deleted.`);
         } catch (e) {
             log.error("Error with request");
             log.error(e);
