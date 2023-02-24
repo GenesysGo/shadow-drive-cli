@@ -53,7 +53,7 @@ programCommand("create-storage-account")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
         const storageConfig = drive.storageConfigPDA;
@@ -213,7 +213,7 @@ programCommand("edit-file")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
         const storageConfig = drive.storageConfigPDA;
@@ -297,7 +297,7 @@ async function handleUpload(
 ) {
     const keypair = loadWalletKey(options.keypair);
     const wallet = new anchor.Wallet(keypair);
-    const connection = new anchor.web3.Connection(options.rpc);
+    const connection = new anchor.web3.Connection(options.rpc, "processed");
     const drive = await new ShdwDrive(connection, wallet).init();
     const userInfo = drive.userInfo;
     const [programClient, provider] = getAnchorEnvironment(keypair, connection);
@@ -350,6 +350,8 @@ async function handleUpload(
     }
 
     let userInfoData = await programClient.account.userInfo.fetch(userInfo);
+
+    log.debug({ userInfoData });
 
     let numberOfStorageAccounts = userInfoData.accountCounter - 1;
 
@@ -563,7 +565,7 @@ programCommand("delete-file")
         const keypair = loadWalletKey(path.resolve(options.keypair));
         log.debug("Input params:", { options });
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
 
         const [programClient, provider] = getAnchorEnvironment(
@@ -625,7 +627,7 @@ programCommand("get-storage-account")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(path.resolve(options.keypair));
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
         const [programClient, provider] = getAnchorEnvironment(
@@ -687,7 +689,7 @@ programCommand("delete-storage-account")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
 
         const userInfo = drive.userInfo;
@@ -778,7 +780,7 @@ programCommand("undelete-storage-account")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
         const [programClient, provider] = getAnchorEnvironment(
@@ -881,7 +883,7 @@ programCommand("add-storage")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
 
@@ -1017,7 +1019,7 @@ programCommand("reduce-storage")
         log.debug("storageInputAsBytes", storageInputAsBytes);
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
         const [programClient, provider] = getAnchorEnvironment(
@@ -1119,7 +1121,7 @@ programCommand("make-storage-account-immutable")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
 
         const drive = await new ShdwDrive(connection, wallet).init();
 
@@ -1218,7 +1220,7 @@ programCommand("claim-stake")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
         const [programClient, provider] = getAnchorEnvironment(
@@ -1388,7 +1390,7 @@ programCommand("redeem-file-account-rent")
     .action(async (options, cmd) => {
         const keypair = loadWalletKey(options.keypair);
         const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc);
+        const connection = new anchor.web3.Connection(options.rpc, "processed");
 
         const drive = await new ShdwDrive(connection, wallet).init();
 
