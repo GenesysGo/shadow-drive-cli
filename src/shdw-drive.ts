@@ -26,7 +26,7 @@ import { ShadowDriveResponse, ShdwDrive } from "@shadow-drive/sdk";
 import { from, map, mergeMap, tap, toArray } from "rxjs";
 import mime from "mime-types";
 
-program.version("0.3.9");
+program.version("0.4.0");
 program.description(
     "CLI for interacting with Shade Drive. This tool uses Solana's Mainnet-Beta network with an internal RPC configuration. It does not use your local Solana configurations."
 );
