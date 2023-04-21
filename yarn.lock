@@ -114,10 +114,10 @@
     bn.js "^5.1.2"
     buffer-layout "^1.2.0"
 
-"@shadow-drive/sdk@^3.0.10":
-  version "3.0.10"
-  resolved "https://registry.yarnpkg.com/@shadow-drive/sdk/-/sdk-3.0.10.tgz#affb6e379de3be84dcd0465480e3841310549568"
-  integrity sha512-OYyh3DTn83Y2wN8Cx/fqOVkoZyz/CVj52nTJ7Gdi+QRV+WxzTj259sz6K7iJMRJ5s0OlKD6nSz1mnc19gwCcJQ==
+"@shadow-drive/sdk@^3.1.1":
+  version "3.3.0"
+  resolved "https://registry.yarnpkg.com/@shadow-drive/sdk/-/sdk-3.3.0.tgz#c506c6ca7d22fb6a3dbb334df0d8314a9ce392e3"
+  integrity sha512-lgL2kG0xFnWJ19YyNVI0Rd7ke1Kdtlxj8NDUNoNxyoqPa7RqAXb4wVrrgzc17iULqNOoSAAbR0o3YTRYnBDltA==
   dependencies:
     "@project-serum/anchor" "^0.24.2"
     "@solana/spl-token" "^0.2.0"
@@ -415,6 +415,11 @@ borsh@^0.7.0:
     bn.js "^5.2.0"
     bs58 "^4.0.0"
     text-encoding-utf-8 "^1.0.2"
+
+bottleneck@^2.19.5:
+  version "2.19.5"
+  resolved "https://registry.yarnpkg.com/bottleneck/-/bottleneck-2.19.5.tgz#5df0b90f59fd47656ebe63c78a98419205cadd91"
+  integrity sha512-VHiNCbI1lKdl44tGrhNfU3lup0Tj/ZBMJB5/2ZbNXRCPuRCO7ed2mgcK4r17y+KB2EfuYuRaVlwNbAeaWGSpbw==
 
 braces@^3.0.2:
   version "3.0.2"
