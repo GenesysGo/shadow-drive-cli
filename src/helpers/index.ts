@@ -16,6 +16,7 @@ import {
 import { Program } from "@project-serum/anchor";
 import { SHDW_DRIVE_ENDPOINT, programId } from "../constants";
 import fetch from "node-fetch";
+import Bottleneck from "bottleneck";
 
 export function loadWalletKey(keypair: string): Keypair {
     if (!keypair || keypair == "") {
@@ -117,6 +118,10 @@ export async function getFormattedStorageAccounts(
     key: anchor.web3.PublicKey,
     totalAccounts: number
 ): Promise<[Array<any>, Array<anchor.web3.PublicKey>]> {
+    const limiter = new Bottleneck({
+        minTime: 50,
+        maxConcurrent: 10,
+    });
     let accountsToFetch: anchor.web3.PublicKey[] = [];
 
     for (let i = 0; i <= totalAccounts; i++) {
@@ -136,28 +141,32 @@ export async function getFormattedStorageAccounts(
 
     await Promise.all(
         accountsToFetch.map(async (account) => {
-            const storageAccountDetails = await fetch(
-                `${SHDW_DRIVE_ENDPOINT}/storage-account-info`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        storage_account: account.toString(),
-                    }),
+            try {
+                const storageAccountDetails = await limiter.schedule(() =>
+                    fetch(`${SHDW_DRIVE_ENDPOINT}/storage-account-info`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            storage_account: account.toString(),
+                        }),
+                    })
+                );
+                // TODO proper handling of this fetch request
+                const storageAccountDetailsJson =
+                    await storageAccountDetails.json();
+                if (
+                    storageAccountDetailsJson.identifier !== null &&
+                    typeof storageAccountDetailsJson.identifier !== "undefined"
+                ) {
+                    accounts.push(storageAccountDetailsJson);
                 }
-            );
-            // TODO proper handling of this fetch request
-            const storageAccountDetailsJson =
-                await storageAccountDetails.json();
-            if (
-                storageAccountDetailsJson.identifier !== null &&
-                typeof storageAccountDetailsJson.identifier !== "undefined"
-            ) {
-                accounts.push(storageAccountDetailsJson);
+                return storageAccountDetailsJson;
+            } catch (e) {
+                log.error(e);
+                return null;
             }
-            return storageAccountDetailsJson;
         })
     );
     let alist1 = accounts.map((account: any, idx: number) => {
