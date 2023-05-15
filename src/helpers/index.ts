@@ -176,6 +176,7 @@ export async function getFormattedStorageAccounts(
             pubkey: account?.identifier
                 ? new anchor.web3.PublicKey(account.storage_account)
                 : null,
+            lastFeeEpoch: account?.identifier ? account.last_fee_epoch : null,
             toBeDeleted: account?.identifier ? account.to_be_deleted : null,
             immutable: account?.identifier ? account.immutable : null,
             version: account?.identifier ? account.version : null,
