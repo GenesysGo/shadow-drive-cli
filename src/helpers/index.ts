@@ -8,12 +8,12 @@ import log from "loglevel";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
 
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
     IDL,
     ShadowDriveUserStaking,
 } from "../types/shadow_drive_user_staking";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { SHDW_DRIVE_ENDPOINT, programId } from "../constants";
 import fetch from "node-fetch";
 

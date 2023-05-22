@@ -1,4 +1,4 @@
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 export const SHDW_DRIVE_ENDPOINT = "https://shadow-storage.genesysgo.net";
 export const BYTES_PER_GIB = 1_073_741_824;
 export const tokenMint = new anchor.web3.PublicKey(

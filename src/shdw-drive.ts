@@ -3,7 +3,7 @@ import * as fs from "fs";
 import ora from "ora";
 import * as path from "path";
 import prompts from "prompts";
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { program } from "commander";
 import log from "loglevel";
