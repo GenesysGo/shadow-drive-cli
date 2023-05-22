@@ -13,8 +13,8 @@
         "build": "tsc"
     },
     "dependencies": {
-        "@project-serum/anchor": "^0.24.2",
-        "@shadow-drive/sdk": "^3.1.1",
+        "@project-serum/anchor": "^0.26.0",
+        "@shadow-drive/sdk": "file:.yalc/@shadow-drive/sdk",
         "@solana/spl-token": "^0.2.0",
         "@solana/web3.js": "^1.41.0",
         "bigint-conversion": "^2.2.1",
