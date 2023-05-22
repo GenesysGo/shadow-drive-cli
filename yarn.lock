@@ -154,7 +154,6 @@
   dependencies:
     bn.js "^5.1.2"
     buffer-layout "^1.2.0"
-
 "@shadow-drive/sdk@^4.0.0":
   version "4.0.0-rc1"
   resolved "https://registry.yarnpkg.com/@shadow-drive/sdk/-/sdk-4.0.0-rc1.tgz#6fdb79a7343b880bcfb2d8ffa71adc46dec50a72"
@@ -486,6 +485,11 @@ borsh@^0.7.0:
     bn.js "^5.2.0"
     bs58 "^4.0.0"
     text-encoding-utf-8 "^1.0.2"
+
+bottleneck@^2.19.5:
+  version "2.19.5"
+  resolved "https://registry.yarnpkg.com/bottleneck/-/bottleneck-2.19.5.tgz#5df0b90f59fd47656ebe63c78a98419205cadd91"
+  integrity sha512-VHiNCbI1lKdl44tGrhNfU3lup0Tj/ZBMJB5/2ZbNXRCPuRCO7ed2mgcK4r17y+KB2EfuYuRaVlwNbAeaWGSpbw==
 
 braces@^3.0.2:
   version "3.0.2"
