@@ -8,12 +8,12 @@ import log from "loglevel";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
 
-import * as anchor from "@project-serum/anchor";
+import * as anchor from "@coral-xyz/anchor";
 import {
     IDL,
     ShadowDriveUserStaking,
 } from "../types/shadow_drive_user_staking";
-import { Program } from "@project-serum/anchor";
+import { Program } from "@coral-xyz/anchor";
 import { SHDW_DRIVE_ENDPOINT, programId } from "../constants";
 import fetch from "node-fetch";
 import Bottleneck from "bottleneck";
@@ -184,6 +184,9 @@ export async function getFormattedStorageAccounts(
                 : null,
             pubkey: account?.identifier
                 ? new anchor.web3.PublicKey(account.storage_account)
+                : null,
+            lastFeeEpoch: account?.last_fee_epoch
+                ? account.last_fee_epoch
                 : null,
             toBeDeleted: account?.identifier ? account.to_be_deleted : null,
             immutable: account?.identifier ? account.immutable : null,
