@@ -24,11 +24,6 @@ import { ShadowDriveResponse, ShdwDrive, UserInfo } from "@shadow-drive/sdk";
 import { from, map, mergeMap, tap, toArray } from "rxjs";
 import mime from "mime-types";
 
-function errorColor(str: string) {
-    // Add ANSI escape codes to display text in red.
-    return `\x1b[31m${str}\x1b[0m`;
-}
-
 program.version("0.5.0");
 program.description(
     "CLI for interacting with Shade Drive. This tool uses Solana's Mainnet-Beta network with an internal RPC configuration. It does not use your local Solana configurations."
@@ -180,9 +175,9 @@ programCommand("create-storage-account")
         try {
             storageResponse = await drive.createStorageAccount(
                 options.name,
-                storageInput,
-                "v2"
+                storageInput
             );
+            log.info(storageResponse);
         } catch (e) {
             txnSpinner.fail(
                 "Error processing transaction. See below for details:"
@@ -261,17 +256,8 @@ programCommand("edit-file")
             );
         }
 
-        let storageAccountOnChain;
-        if (storageAccountType === "V1") {
-            storageAccountOnChain =
-                programClient.account.storageAccount.fetch(storageAccount);
-        }
-        if (storageAccountType === "V2") {
-            storageAccountOnChain =
-                await programClient.account.storageAccountV2.fetch(
-                    storageAccount
-                );
-        }
+        let storageAccountOnChain =
+            await programClient.account.storageAccountV2.fetch(storageAccount);
 
         log.debug({ storageAccountOnChain });
 
@@ -293,8 +279,7 @@ programCommand("edit-file")
                 {
                     name: fileName,
                     file: fileData,
-                },
-                "v2"
+                }
             );
             txnSpinner.succeed(`File account updated: ${fileName}`);
             log.info(
@@ -367,12 +352,8 @@ async function handleUpload(
 
     const accountsSpinner = ora("Fetching all storage accounts").start();
 
-    let rawV1Accounts = await drive.getStorageAccounts("v1");
-    let rawV2Accounts = await drive.getStorageAccounts("v2");
-    let [formattedAccounts] = await getFormattedStorageAccounts(
-        rawV1Accounts,
-        rawV2Accounts
-    );
+    let rawAccounts = await drive.getStorageAccounts();
+    let [formattedAccounts] = await getFormattedStorageAccounts(rawAccounts);
 
     formattedAccounts = formattedAccounts.sort(
         sortByProperty("accountCounterSeed")
@@ -619,8 +600,7 @@ programCommand("delete-file")
             );
             deleteResponse = await drive.deleteFile(
                 storageAccount,
-                options.url,
-                "v2"
+                options.url
             );
             log.info(`File ${options.url} successfully deleted.`);
         } catch (e) {
@@ -648,11 +628,9 @@ programCommand("get-storage-account")
                 "You have not created a storage account yet on Shadow Drive. Please see the 'create-storage-account' command to get started."
             );
         }
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -705,11 +683,9 @@ programCommand("delete-storage-account")
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
         formattedAccounts = formattedAccounts.sort(
             sortByProperty("accountCounterSeed")
@@ -754,13 +730,10 @@ programCommand("delete-storage-account")
             "Sending storage account deletion request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            if (storageAccountType === "V1") {
-                await drive.deleteStorageAccount(storageAccount, "v1");
-            }
-
-            if (storageAccountType === "V2") {
-                await drive.deleteStorageAccount(storageAccount, "v2");
-            }
+            const deleteStorage = await drive.deleteStorageAccount(
+                storageAccount
+            );
+            log.info(deleteStorage);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
@@ -790,11 +763,9 @@ programCommand("undelete-storage-account")
             );
         }
 
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -843,13 +814,10 @@ programCommand("undelete-storage-account")
             "Sending storage account undelete request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            if (storageAccountType === "V1") {
-                await drive.cancelDeleteStorageAccount(storageAccount, "v1");
-            }
-
-            if (storageAccountType === "V2") {
-                await drive.cancelDeleteStorageAccount(storageAccount, "v2");
-            }
+            const cancelDelete = await drive.cancelDeleteStorageAccount(
+                storageAccount
+            );
+            log.info(cancelDelete);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
@@ -875,7 +843,6 @@ programCommand("add-storage")
         const wallet = new anchor.Wallet(keypair);
         const connection = new anchor.web3.Connection(options.rpc, "confirmed");
         const drive = await new ShdwDrive(connection, wallet).init();
-        const userInfo = drive.userInfo;
 
         let storageInput = options.size;
         let storageInputAsBytes = humanSizeToBytes(storageInput);
@@ -886,18 +853,14 @@ programCommand("add-storage")
             return;
         }
         log.debug("storageInputAsBytes", storageInputAsBytes);
-        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
-        if (userInfoAccount === null) {
-            return log.error(
-                "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
-            );
+        let rawAccounts;
+        try {
+            rawAccounts = await drive.getStorageAccounts();
+        } catch (e) {
+            return log.error(e.message);
         }
-
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -939,24 +902,11 @@ programCommand("add-storage")
             "Sending add storage request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            // Mutable V1 add storage
-            if (accountType === "V1") {
-                const addStorage = await drive.addStorage(
-                    storageAccount,
-                    storageInput,
-                    "v1"
-                );
-                log.info(addStorage);
-            }
-            // Mutable V2 Add Storage
-            if (accountType === "V2") {
-                const addStorage = await drive.addStorage(
-                    storageAccount,
-                    storageInput,
-                    "v2"
-                );
-                log.info(addStorage);
-            }
+            const addStorage = await drive.addStorage(
+                storageAccount,
+                storageInput
+            );
+            log.info(addStorage);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
@@ -999,11 +949,9 @@ programCommand("reduce-storage")
             );
         }
 
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1051,22 +999,11 @@ programCommand("reduce-storage")
             "Sending reduce storage request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            if (storageAccountType === "V1") {
-                const reduceStorage = await drive.reduceStorage(
-                    storageAccount,
-                    storageInput,
-                    "v1"
-                );
-                log.info(reduceStorage);
-            }
-            if (storageAccountType === "V2") {
-                const reduceStorage = await drive.reduceStorage(
-                    storageAccount,
-                    storageInput,
-                    "v2"
-                );
-                log.info(reduceStorage);
-            }
+            const reduceStorage = await drive.reduceStorage(
+                storageAccount,
+                storageInput
+            );
+            log.info(reduceStorage);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
@@ -1098,11 +1035,9 @@ programCommand("make-storage-account-immutable")
             );
         }
 
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
         formattedAccounts = formattedAccounts.sort(
             sortByProperty("accountCounterSeed")
@@ -1143,23 +1078,10 @@ programCommand("make-storage-account-immutable")
             "Sending make account immutable request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            if (storageAccountType === "V1") {
-                const makeImmutable = await drive.makeStorageImmutable(
-                    storageAccount,
-                    "v1"
-                );
-
-                log.debug(makeImmutable);
-            }
-
-            if (storageAccountType === "V2") {
-                const makeImmutable = await drive.makeStorageImmutable(
-                    storageAccount,
-                    "v2"
-                );
-
-                log.debug(makeImmutable);
-            }
+            const makeImmutable = await drive.makeStorageImmutable(
+                storageAccount
+            );
+            log.info(makeImmutable);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
@@ -1204,10 +1126,9 @@ programCommand("claim-stake")
         const accountFetchSpinner = ora(
             "Fetching all storage accounts and claimable stake"
         ).start();
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts, accountsToFetch] =
-            await getFormattedStorageAccounts(rawV1Accounts, rawV2Accounts);
+            await getFormattedStorageAccounts(rawAccounts);
         formattedAccounts = await Promise.all(
             formattedAccounts.map(async (account: any, idx: number) => {
                 const accountKey = new anchor.web3.PublicKey(
@@ -1313,14 +1234,8 @@ programCommand("claim-stake")
             "Sending claim stake transaction request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            if (storageAccountType === "V1") {
-                const claimStake = await drive.claimStake(storageAccount, "v1");
-                log.info(claimStake);
-            }
-            if (storageAccountType === "V2") {
-                const claimStake = await drive.claimStake(storageAccount, "v2");
-                log.info(claimStake);
-            }
+            const claimStake = await drive.claimStake(storageAccount);
+            log.info(claimStake);
             txnSpinner.succeed(
                 `You have claimed ${formattedAccount.unstakeTokenAccountBalance.value.uiAmount} $SHDW from your storage account ${storageAccount}.`
             );
@@ -1333,119 +1248,6 @@ programCommand("claim-stake")
             return;
         }
         return;
-    });
-
-programCommand("redeem-file-account-rent")
-    .requiredOption(
-        "-kp, --keypair <string>",
-        "Path to wallet that owns the storage account you want to claim available stake from."
-    )
-    .action(async (options, cmd) => {
-        const keypair = loadWalletKey(options.keypair);
-        const wallet = new anchor.Wallet(keypair);
-        const connection = new anchor.web3.Connection(options.rpc, "confirmed");
-
-        const drive = await new ShdwDrive(connection, wallet).init();
-
-        const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
-        if (userInfoAccount === null) {
-            return log.error(
-                "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
-            );
-        }
-
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
-        let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
-        );
-
-        formattedAccounts = formattedAccounts.sort(
-            sortByProperty("accountCounterSeed")
-        );
-
-        const pickedAccount = await prompts({
-            type: "select",
-            name: "option",
-            message:
-                "Which storage account do you want to redeem all file rent from?",
-            choices: formattedAccounts.map((acc: any) => {
-                return {
-                    title: `${acc.identifier} - ${acc.pubkey.toString()} - ${
-                        acc.storageAvailable
-                    } remaining`,
-                };
-            }),
-        });
-
-        if (typeof pickedAccount.option === "undefined") {
-            log.error(
-                "You must pick a storage account to redeem file rent from."
-            );
-            return;
-        }
-
-        // Get current storage and user funds
-        const storageAccount = formattedAccounts[pickedAccount.option].pubkey;
-        const agrees = await prompts({
-            type: "confirm",
-            name: "confirm",
-            message: `Warning: this will delete all on-chain file accounts associated with the storage account ${storageAccount.toString()} in order to reclaim the SOL rent. Your data/files will not be removed from Shadow Drive.`,
-            initial: false,
-        });
-        if (!agrees.confirm) {
-            return log.error("You must confirm before moving forward.");
-        }
-        const onchainStorageAccountInfo =
-            await programClient.account.storageAccount.fetch(storageAccount);
-        const numberOfFiles = onchainStorageAccountInfo.initCounter;
-        let filePubkeys: PublicKey[] = [];
-        for (let i = 0; i < numberOfFiles; i++) {
-            const fileSeed = new anchor.BN(i);
-            let [file] = anchor.web3.PublicKey.findProgramAddressSync(
-                [
-                    storageAccount.toBytes(),
-                    fileSeed.toTwos(64).toArrayLike(Buffer, "le", 4),
-                ],
-                programClient.programId
-            );
-            let fileAccountInfo = await connection.getAccountInfo(file);
-            if (fileAccountInfo) {
-                filePubkeys.push(file);
-            }
-        }
-        const progress = new cliProgress.SingleBar({
-            format: "Progress | {bar} | {percentage}% || {value}/{total} file accounts closed",
-            barCompleteChar: "\u2588",
-            barIncompleteChar: "\u2591",
-            hideCursor: true,
-        });
-        progress.start(filePubkeys.length, 0);
-        await Promise.all(
-            filePubkeys.map(async (pubkey) => {
-                try {
-                    const redeem = await drive.redeemRent(
-                        storageAccount,
-                        pubkey
-                    );
-                    log.info(redeem);
-                    progress.increment(1);
-                } catch (e) {
-                    log.error("Error with transaction, see below for details");
-                    log.error(e);
-                }
-            })
-        );
-        progress.stop();
-        log.info(
-            `Successfully reclaimed rent from all file accounts in storage account ${storageAccount.toString()}`
-        );
     });
 programCommand("refresh-stake")
     .requiredOption(
@@ -1466,11 +1268,9 @@ programCommand("refresh-stake")
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1511,20 +1311,8 @@ programCommand("refresh-stake")
             "Sending refresh stake transaction request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            if (storageAccountType === "V1") {
-                const claimStake = await drive.refreshStake(
-                    storageAccount,
-                    "v1"
-                );
-                log.info(claimStake);
-            }
-            if (storageAccountType === "V2") {
-                const claimStake = await drive.refreshStake(
-                    storageAccount,
-                    "v2"
-                );
-                log.info(claimStake);
-            }
+            const refreshStake = await drive.refreshStake(storageAccount);
+            log.info(refreshStake);
             txnSpinner.succeed(
                 `You have refreshed stake for storage account ${storageAccount}.`
             );
@@ -1561,11 +1349,9 @@ programCommand("top-up")
             );
         }
 
-        let rawV1Accounts = await drive.getStorageAccounts("v1");
-        let rawV2Accounts = await drive.getStorageAccounts("v2");
+        let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            rawV1Accounts,
-            rawV2Accounts
+            rawAccounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1606,11 +1392,11 @@ programCommand("top-up")
             "Sending top up transaction request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
         try {
-            const claimStake = await drive.topUp(
+            const topUp = await drive.topUp(
                 storageAccount,
                 options.amount * 10 ** 9
             );
-            log.info(claimStake);
+            log.info(topUp);
             txnSpinner.succeed(
                 `You have added stake for storage account ${storageAccount}.`
             );
