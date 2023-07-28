@@ -7,14 +7,12 @@ import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { program } from "commander";
 import log from "loglevel";
-import fetch from "node-fetch";
-import { BYTES_PER_GIB, SHDW_DRIVE_ENDPOINT, tokenMint } from "./constants";
+import { BYTES_PER_GIB, tokenMint } from "./constants";
 import {
     bytesToHuman,
     findAssociatedTokenAddress,
     getAnchorEnvironment,
     getFormattedStorageAccounts,
-    getStorageConfigPDA,
     humanSizeToBytes,
     loadWalletKey,
     parseScientific,
@@ -22,9 +20,14 @@ import {
     validateStorageAccount,
 } from "./helpers";
 import cliProgress from "cli-progress";
-import { ShadowDriveResponse, ShdwDrive } from "@shadow-drive/sdk";
+import { ShadowDriveResponse, ShdwDrive, UserInfo } from "@shadow-drive/sdk";
 import { from, map, mergeMap, tap, toArray } from "rxjs";
 import mime from "mime-types";
+
+function errorColor(str: string) {
+    // Add ANSI escape codes to display text in red.
+    return `\x1b[31m${str}\x1b[0m`;
+}
 
 program.version("0.5.0");
 program.description(
@@ -75,7 +78,7 @@ programCommand("create-storage-account")
         }
         if (!storageConfigInfo) return;
         // If userInfo hasn't been initialized, default to 0 for account seed
-        let userInfoAccount = await connection.getAccountInfo(userInfo);
+        let userInfoAccount = await UserInfo.fetch(connection, userInfo);
         let accountSeed = new anchor.BN(0);
         if (userInfoAccount !== null) {
             let userInfoData = await programClient.account.userInfo.fetch(
@@ -115,7 +118,7 @@ programCommand("create-storage-account")
             .mul(shadesPerGib)
             .div(bytesPerGib);
         const accountCostUiAmount = parseScientific(
-            (accountCostEstimate / new anchor.BN(10 ** 9)).toString()
+            accountCostEstimate.div(new anchor.BN(10 ** 9)).toString()
         );
 
         const confirmStorageCost = await prompts({
@@ -163,11 +166,11 @@ programCommand("create-storage-account")
             programClient.programId
         );
 
-        log.debug("storageRequested:", storageRequested);
+        log.debug("storageRequested:", storageRequested.toNumber());
         log.debug("identifier:", identifier);
-        log.debug("storageAccount:", storageAccount);
-        log.debug("userInfo:", userInfo);
-        log.debug("stakeAccount:", stakeAccount);
+        log.debug("storageAccount:", storageAccount.toString());
+        log.debug("userInfo:", userInfo.toString());
+        log.debug("stakeAccount:", stakeAccount.toString());
         log.debug("Sending off initializeAccount tx");
 
         const txnSpinner = ora(
@@ -184,8 +187,7 @@ programCommand("create-storage-account")
             txnSpinner.fail(
                 "Error processing transaction. See below for details:"
             );
-            log.error(`${e}`);
-
+            log.error(`${e.message}`);
             return;
         }
         txnSpinner.succeed(
@@ -240,7 +242,7 @@ programCommand("edit-file")
             options.file.lastIndexOf("/") + 1
         );
         const fileData = fs.readFileSync(options.file);
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
@@ -315,7 +317,6 @@ async function handleUpload(
     const connection = new anchor.web3.Connection(options.rpc, "confirmed");
     const drive = await new ShdwDrive(connection, wallet).init();
     const userInfo = drive.userInfo;
-    const [programClient, provider] = getAnchorEnvironment(keypair, connection);
     const programLogPath = path.join(
         process.cwd(),
         `shdw-drive-upload-${Math.round(new Date().getTime() / 100)}.json`
@@ -357,24 +358,20 @@ async function handleUpload(
     });
     fileSpinner.succeed();
 
-    const userInfoAccount = await connection.getAccountInfo(userInfo);
+    const userInfoAccount = await UserInfo.fetch(connection, userInfo);
     if (userInfoAccount === null) {
         return log.error(
             "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
         );
     }
 
-    let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-    log.debug({ userInfoData });
-
-    let numberOfStorageAccounts = userInfoData.accountCounter - 1;
-
     const accountsSpinner = ora("Fetching all storage accounts").start();
 
+    let rawV1Accounts = await drive.getStorageAccounts("v1");
+    let rawV2Accounts = await drive.getStorageAccounts("v2");
     let [formattedAccounts] = await getFormattedStorageAccounts(
-        keypair.publicKey,
-        numberOfStorageAccounts
+        rawV1Accounts,
+        rawV2Accounts
     );
 
     formattedAccounts = formattedAccounts.sort(
@@ -645,24 +642,17 @@ programCommand("get-storage-account")
         const connection = new anchor.web3.Connection(options.rpc, "confirmed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account yet on Shadow Drive. Please see the 'create-storage-account' command to get started."
             );
         }
-        // TODO add hanlding for if userInfo is not initialized yet for a keypair
-        const userInfoData = await programClient.account.userInfo.fetch(
-            userInfo
-        );
-        const numberOfStorageAccounts = userInfoData.accountCounter - 1;
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -708,23 +698,18 @@ programCommand("delete-storage-account")
         const drive = await new ShdwDrive(connection, wallet).init();
 
         const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
-
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
         formattedAccounts = formattedAccounts.sort(
             sortByProperty("accountCounterSeed")
@@ -780,7 +765,7 @@ programCommand("delete-storage-account")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e);
+            return log.error(e.message);
         }
         txnSpinner.succeed(
             `Storage account deletion request successfully submitted for account ${storageAccount.toString()}. You have until the end of the current Solana Epoch to revert this account deletion request. Once the account is fully deleted, you will receive the SOL rent and SHDW staked back in your wallet.`
@@ -798,23 +783,18 @@ programCommand("undelete-storage-account")
         const connection = new anchor.web3.Connection(options.rpc, "confirmed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -855,11 +835,6 @@ programCommand("undelete-storage-account")
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
         }
-        const [stakeAccount] = await anchor.web3.PublicKey.findProgramAddress(
-            [Buffer.from("stake-account"), storageAccount.toBytes()],
-            programClient.programId
-        );
-
         log.debug({
             storageAccount: storageAccount.toString(),
         });
@@ -879,7 +854,7 @@ programCommand("undelete-storage-account")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e);
+            return log.error(e.message);
         }
         txnSpinner.succeed(
             `Storage account undelete request successfully submitted for account ${storageAccount.toString()}. This account will no longer be deleted.`
@@ -902,10 +877,6 @@ programCommand("add-storage")
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
 
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
         let storageInput = options.size;
         let storageInputAsBytes = humanSizeToBytes(storageInput);
         if (storageInputAsBytes === false) {
@@ -915,20 +886,18 @@ programCommand("add-storage")
             return;
         }
         log.debug("storageInputAsBytes", storageInputAsBytes);
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
-
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -966,21 +935,6 @@ programCommand("add-storage")
                 `Storage account ${storageAccount} is not a valid Shadow Drive Storage Account.`
             );
         }
-        const [stakeAccount] = await anchor.web3.PublicKey.findProgramAddress(
-            [Buffer.from("stake-account"), storageAccount.toBytes()],
-            programClient.programId
-        );
-        const ownerAta = await findAssociatedTokenAddress(
-            keypair.publicKey,
-            tokenMint
-        );
-
-        log.debug({
-            storageAccount: storageAccount.toString(),
-            stakeAccount: stakeAccount.toString(),
-            ownerAta: ownerAta.toString(),
-        });
-
         const txnSpinner = ora(
             "Sending add storage request. Subject to solana traffic conditions (w/ 120s timeout)."
         ).start();
@@ -1007,7 +961,7 @@ programCommand("add-storage")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e);
+            return log.error(e.message);
         }
         txnSpinner.succeed(`Storage account capacity successfully increased`);
         return;
@@ -1037,24 +991,19 @@ programCommand("reduce-storage")
         const connection = new anchor.web3.Connection(options.rpc, "confirmed");
         const drive = await new ShdwDrive(connection, wallet).init();
         const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
 
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1122,7 +1071,7 @@ programCommand("reduce-storage")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e);
+            return log.error(e.message);
         }
         txnSpinner.succeed(`Storage account capacity successfully reduced.`);
         return;
@@ -1141,24 +1090,19 @@ programCommand("make-storage-account-immutable")
         const drive = await new ShdwDrive(connection, wallet).init();
 
         const userInfo = drive.userInfo;
-        const storageConfig = drive.storageConfigPDA;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
         formattedAccounts = formattedAccounts.sort(
             sortByProperty("accountCounterSeed")
@@ -1220,7 +1164,7 @@ programCommand("make-storage-account-immutable")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e);
+            return log.error(e.message);
         }
         txnSpinner.succeed(
             `Storage account ${storageAccount.toString()} has been marked as immutable. Files can no longer be deleted from this storage account.`
@@ -1250,26 +1194,20 @@ programCommand("claim-stake")
         let unstakeEpochperiod = parseInt(
             programConstants["UNSTAKE_EPOCH_PERIOD"]
         );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
-
         const accountFetchSpinner = ora(
             "Fetching all storage accounts and claimable stake"
         ).start();
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts, accountsToFetch] =
-            await getFormattedStorageAccounts(
-                keypair.publicKey,
-                numberOfStorageAccounts
-            );
-
+            await getFormattedStorageAccounts(rawV1Accounts, rawV2Accounts);
         formattedAccounts = await Promise.all(
             formattedAccounts.map(async (account: any, idx: number) => {
                 const accountKey = new anchor.web3.PublicKey(
@@ -1340,7 +1278,7 @@ programCommand("claim-stake")
         const pickedAccount = await prompts({
             type: "select",
             name: "option",
-            message: "Which storage account do you want to reduce storage on?",
+            message: "Which storage account do you want to claim stake for?",
             warn: "Account not eligible for stake claim yet. Please wait until the epoch specified.",
             choices: formattedAccounts.map((acc: any) => {
                 return {
@@ -1391,7 +1329,7 @@ programCommand("claim-stake")
             txnSpinner.fail(
                 "Error sending transaction. See below for details:"
             );
-            console.log(e);
+            log.error(e.message);
             return;
         }
         return;
@@ -1414,20 +1352,18 @@ programCommand("redeem-file-account-rent")
             keypair,
             connection
         );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
-
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1524,24 +1460,17 @@ programCommand("refresh-stake")
         const drive = await new ShdwDrive(connection, wallet).init();
 
         const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
-
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
-
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1600,10 +1529,11 @@ programCommand("refresh-stake")
                 `You have refreshed stake for storage account ${storageAccount}.`
             );
             return;
-        } catch (e) {
+        } catch (e: any) {
             txnSpinner.fail(
                 "Error sending transaction. See below for details:"
             );
+            log.error(e.message);
             return;
         }
     });
@@ -1624,24 +1554,18 @@ programCommand("top-up")
         const drive = await new ShdwDrive(connection, wallet).init();
 
         const userInfo = drive.userInfo;
-        const [programClient, provider] = getAnchorEnvironment(
-            keypair,
-            connection
-        );
-        const userInfoAccount = await connection.getAccountInfo(userInfo);
+        const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
             return log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
         }
 
-        let userInfoData = await programClient.account.userInfo.fetch(userInfo);
-
-        let numberOfStorageAccounts = userInfoData.accountCounter - 1;
-
+        let rawV1Accounts = await drive.getStorageAccounts("v1");
+        let rawV2Accounts = await drive.getStorageAccounts("v2");
         let [formattedAccounts] = await getFormattedStorageAccounts(
-            keypair.publicKey,
-            numberOfStorageAccounts
+            rawV1Accounts,
+            rawV2Accounts
         );
 
         formattedAccounts = formattedAccounts.sort(
@@ -1695,6 +1619,7 @@ programCommand("top-up")
             txnSpinner.fail(
                 "Error sending transaction. See below for details:"
             );
+            log.error(e.message);
             return;
         }
     });
@@ -1724,4 +1649,4 @@ function setLogLevel(value: any, prev: any) {
     log.setLevel(value);
 }
 
-program.parse(process.argv);
+program.parseAsync(process.argv);
