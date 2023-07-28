@@ -116,11 +116,7 @@ export function bytesToHuman(bytes: any, si = false, dp = 1) {
  * @returns
  */
 export async function getFormattedStorageAccounts(
-    v1Accounts: Array<{
-        publicKey: anchor.web3.PublicKey;
-        account: StorageAccount;
-    }>,
-    v2Accounts: Array<{
+    rawAccounts: Array<{
         publicKey: anchor.web3.PublicKey;
         account: StorageAccountV2;
     }>
@@ -129,12 +125,8 @@ export async function getFormattedStorageAccounts(
         minTime: 50,
         maxConcurrent: 10,
     });
-    let accountsToSort = [...v1Accounts, ...v2Accounts];
-    let accountKeys = [
-        ...v1Accounts.map((account) => account.publicKey),
-        ...v2Accounts.map((account) => account.publicKey),
-    ];
-    log.debug(`Accounts to Fetch length: ${accountsToSort.length}`);
+    let accountKeys = [...rawAccounts.map((account) => account.publicKey)];
+    log.debug(`Accounts to Fetch length: ${rawAccounts.length}`);
     let accounts: any = [];
 
     await Promise.all(
