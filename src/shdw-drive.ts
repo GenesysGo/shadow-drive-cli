@@ -69,9 +69,9 @@ programCommand("create-storage-account")
             log.error(
                 `Unable to retrieve Shadow Drive storage config account.\n${e}`
             );
-            return;
+            return process.exit(0);
         }
-        if (!storageConfigInfo) return;
+        if (!storageConfigInfo) return process.exit(0);
         // If userInfo hasn't been initialized, default to 0 for account seed
         let userInfoAccount = await UserInfo.fetch(connection, userInfo);
         let accountSeed = new anchor.BN(0);
@@ -93,7 +93,7 @@ programCommand("create-storage-account")
                 log.error(
                     "You must agree to the Terms of Service before creating your first storage account on Shadow Drive."
                 );
-                return;
+                return process.exit(0);
             }
         }
 
@@ -103,7 +103,7 @@ programCommand("create-storage-account")
             log.error(
                 `${options.size} is not a valid input for size. Please use a string like '1KB', '1MB', '1GB'.`
             );
-            return;
+            return process.exit(0);
         }
         const shadesPerGib = storageConfigInfo.shadesPerGib;
         const storageInputBigInt = new anchor.BN(Number(storageInputAsBytes));
@@ -123,9 +123,10 @@ programCommand("create-storage-account")
             initial: false,
         });
         if (!confirmStorageCost.acceptStorageCost) {
-            return log.error(
+            log.error(
                 "You must accept the estimated storage cost to continue."
             );
+            return process.exit(0);
         }
 
         log.debug("storageInputAsBytes", storageInputAsBytes);
@@ -138,7 +139,7 @@ programCommand("create-storage-account")
             );
         } catch (e) {
             log.error(`Unable to retrieve Associated token account.\n${e}`);
-            return;
+            return process.exit(0);
         }
         log.debug("Associated token account: ", ata.toString());
 
@@ -183,12 +184,12 @@ programCommand("create-storage-account")
                 "Error processing transaction. See below for details:"
             );
             log.error(`${e.message}`);
-            return;
+            return process.exit(0);
         }
         txnSpinner.succeed(
             `Successfully created your new storage account of ${options.size} located at the following address on Solana: ${storageResponse.shdw_bucket}`
         );
-        return;
+        return process.exit(0);
     });
 
 programCommand("upload-file")
@@ -206,7 +207,6 @@ programCommand("upload-file")
     )
     .action(async (options, cmd) => {
         await handleUpload(options, cmd, "file");
-        return;
     });
 
 programCommand("edit-file")
@@ -239,9 +239,10 @@ programCommand("edit-file")
         const fileData = fs.readFileSync(options.file);
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
         const splitURL: Array<string> = options.url.split("/");
         const storageAccount = new anchor.web3.PublicKey(splitURL[3]);
@@ -251,9 +252,10 @@ programCommand("edit-file")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
 
         let storageAccountOnChain =
@@ -287,8 +289,10 @@ programCommand("edit-file")
                 uploadResponse.finalized_location
             );
             log.info("Your updated file is immediately accessible.");
+            return process.exit(0);
         } catch (e) {
             txnSpinner.fail(e.message);
+            return process.exit(0);
         }
     });
 
@@ -313,10 +317,10 @@ async function handleUpload(
             : [path.resolve(options.file)];
 
     if (mode === "directory" && !fs.statSync(options.directory).isDirectory()) {
-        return log.error("Please select a folder of files to upload.");
+        log.error("Please select a folder of files to upload.");
+        return process.exit(0);
     }
     const fileSpinner = ora("Collecting all files").start();
-    let fileData: any = [];
     let tmpFileData: any = [];
     filesToRead.forEach((file) => {
         const fileName = file.substring(file.lastIndexOf("/") + 1);
@@ -345,9 +349,10 @@ async function handleUpload(
 
     const userInfoAccount = await UserInfo.fetch(connection, userInfo);
     if (userInfoAccount === null) {
-        return log.error(
+        log.error(
             "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
         );
+        return process.exit(0);
     }
 
     const accountsSpinner = ora("Fetching all storage accounts").start();
@@ -382,7 +387,7 @@ async function handleUpload(
             log.error(
                 "You must pick a storage account to use for your upload."
             );
-            return;
+            return process.exit(0);
         }
 
         storageAccount = formattedAccounts[pickedAccount.option].pubkey;
@@ -406,7 +411,7 @@ async function handleUpload(
         log.error(
             `Could not find storage account: ${storageAccount.toString()}`
         );
-        return;
+        return process.exit(0);
     }
 
     tmpFileData.forEach((file: any) => {
@@ -520,6 +525,7 @@ async function handleUpload(
             progress.stop();
             log.debug(results);
             log.info(`${results.length} files uploaded.`);
+            return process.exit(0);
         });
 }
 programCommand("upload-multiple-files")
@@ -542,7 +548,7 @@ programCommand("upload-multiple-files")
     )
     .action(async (options, cmd) => {
         await handleUpload(options, cmd, "directory");
-        return;
+        return process.exit(0);
     });
 
 programCommand("delete-file")
@@ -575,9 +581,10 @@ programCommand("delete-file")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         let storageAccountOnChain: any;
         if (storageAccountType === "V1") {
@@ -602,13 +609,13 @@ programCommand("delete-file")
                 storageAccount,
                 options.url
             );
-            log.info(`File ${options.url} successfully deleted.`);
         } catch (e) {
             log.error("Error with request");
             log.error(e);
+            return process.exit(0);
         }
-
-        return log.info(`File ${options.url} successfully deleted`);
+        log.info(`File ${options.url} successfully deleted`);
+        return process.exit(0);
     });
 
 programCommand("get-storage-account")
@@ -624,9 +631,10 @@ programCommand("get-storage-account")
         const userInfo = drive.userInfo;
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account yet on Shadow Drive. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
         let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
@@ -652,7 +660,7 @@ programCommand("get-storage-account")
 
         if (typeof pickedAccount.option === "undefined") {
             log.error("You must pick a storage account to get.");
-            return;
+            return process.exit(0);
         }
 
         const storageAccount = formattedAccounts[pickedAccount.option];
@@ -661,7 +669,8 @@ programCommand("get-storage-account")
                 storageAccount.identifier
             } - ${storageAccount.pubkey?.toString()}:`
         );
-        return log.info(storageAccount);
+        log.info(storageAccount);
+        return process.exit(0);
     });
 
 programCommand("delete-storage-account")
@@ -679,9 +688,10 @@ programCommand("delete-storage-account")
 
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
         let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
@@ -708,7 +718,7 @@ programCommand("delete-storage-account")
 
         if (typeof pickedAccount.option === "undefined") {
             log.error("You must pick a storage account to add storage to.");
-            return;
+            return process.exit(0);
         }
 
         // Get current storage and user funds
@@ -718,9 +728,10 @@ programCommand("delete-storage-account")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         log.debug({
             storageAccount: storageAccount.toString(),
@@ -738,11 +749,13 @@ programCommand("delete-storage-account")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e.message);
+            log.error(e.message);
+            return process.exit(0);
         }
         txnSpinner.succeed(
             `Storage account deletion request successfully submitted for account ${storageAccount.toString()}. You have until the end of the current Solana Epoch to revert this account deletion request. Once the account is fully deleted, you will receive the SOL rent and SHDW staked back in your wallet.`
         );
+        return process.exit(0);
     });
 
 programCommand("undelete-storage-account")
@@ -758,9 +771,10 @@ programCommand("undelete-storage-account")
         const userInfo = drive.userInfo;
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
 
         let rawAccounts = await drive.getStorageAccounts();
@@ -792,7 +806,7 @@ programCommand("undelete-storage-account")
             log.error(
                 "You must pick a storage account to unmark for deletion."
             );
-            return;
+            return process.exit(0);
         }
 
         // Get current storage and user funds
@@ -802,9 +816,10 @@ programCommand("undelete-storage-account")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         log.debug({
             storageAccount: storageAccount.toString(),
@@ -822,11 +837,13 @@ programCommand("undelete-storage-account")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e.message);
+            log.error(e.message);
+            return process.exit(0);
         }
         txnSpinner.succeed(
             `Storage account undelete request successfully submitted for account ${storageAccount.toString()}. This account will no longer be deleted.`
         );
+        return process.exit(0);
     });
 
 programCommand("add-storage")
@@ -850,14 +867,15 @@ programCommand("add-storage")
             log.error(
                 `${options.size} is not a valid input for size. Please use a string like '1KB', '1MB', '1GB'.`
             );
-            return;
+            return process.exit(0);
         }
         log.debug("storageInputAsBytes", storageInputAsBytes);
         let rawAccounts;
         try {
             rawAccounts = await drive.getStorageAccounts();
         } catch (e) {
-            return log.error(e.message);
+            log.error(e.message);
+            return process.exit(0);
         }
         let [formattedAccounts] = await getFormattedStorageAccounts(
             rawAccounts
@@ -884,7 +902,7 @@ programCommand("add-storage")
 
         if (typeof pickedAccount.option === "undefined") {
             log.error("You must pick a storage account to add storage to.");
-            return;
+            return process.exit(0);
         }
 
         // Get current storage and user funds
@@ -894,9 +912,10 @@ programCommand("add-storage")
             connection
         );
         if (!accountType || accountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         const txnSpinner = ora(
             "Sending add storage request. Subject to solana traffic conditions (w/ 120s timeout)."
@@ -911,10 +930,11 @@ programCommand("add-storage")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e.message);
+            log.error(e.message);
+            return process.exit(0);
         }
         txnSpinner.succeed(`Storage account capacity successfully increased`);
-        return;
+        return process.exit(0);
     });
 
 programCommand("reduce-storage")
@@ -933,7 +953,7 @@ programCommand("reduce-storage")
             log.error(
                 `${options.size} is not a valid input for size. Please use a string like '1KB', '1MB', '1GB'.`
             );
-            return;
+            return process.exit(0);
         }
         log.debug("storageInputAsBytes", storageInputAsBytes);
         const keypair = loadWalletKey(options.keypair);
@@ -944,9 +964,10 @@ programCommand("reduce-storage")
 
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
 
         let rawAccounts = await drive.getStorageAccounts();
@@ -980,7 +1001,7 @@ programCommand("reduce-storage")
             log.error(
                 "You must pick a storage account to remove storage from."
             );
-            return;
+            return process.exit(0);
         }
 
         // Get current storage and user funds
@@ -990,9 +1011,10 @@ programCommand("reduce-storage")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
 
         const txnSpinner = ora(
@@ -1008,10 +1030,11 @@ programCommand("reduce-storage")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e.message);
+            log.error(e.message);
+            return process.exit(0);
         }
         txnSpinner.succeed(`Storage account capacity successfully reduced.`);
-        return;
+        return process.exit(0);
     });
 
 programCommand("make-storage-account-immutable")
@@ -1030,9 +1053,10 @@ programCommand("make-storage-account-immutable")
 
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
 
         let rawAccounts = await drive.getStorageAccounts();
@@ -1060,7 +1084,7 @@ programCommand("make-storage-account-immutable")
 
         if (typeof pickedAccount.option === "undefined") {
             log.error("You must pick a storage account to make immutable.");
-            return;
+            return process.exit(0);
         }
 
         // Get current storage and user funds
@@ -1070,9 +1094,10 @@ programCommand("make-storage-account-immutable")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         const txnSpinner = ora(
             "Sending make account immutable request. Subject to solana traffic conditions (w/ 120s timeout)."
@@ -1086,11 +1111,13 @@ programCommand("make-storage-account-immutable")
             txnSpinner.fail(
                 "Error sending transaction. Please see information below."
             );
-            return log.error(e.message);
+            log.error(e.message);
+            return process.exit(0);
         }
         txnSpinner.succeed(
             `Storage account ${storageAccount.toString()} has been marked as immutable. Files can no longer be deleted from this storage account.`
         );
+        return process.exit(0);
     });
 
 programCommand("claim-stake")
@@ -1118,9 +1145,10 @@ programCommand("claim-stake")
         );
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
 
         const accountFetchSpinner = ora(
@@ -1151,7 +1179,7 @@ programCommand("claim-stake")
                             programClient.programId
                         );
                 } catch (e) {
-                    return;
+                    return process.exit(0);
                 }
                 let unstakeInfoData;
                 let unstakeTokenAccount;
@@ -1162,14 +1190,14 @@ programCommand("claim-stake")
                             unstakeInfo
                         );
                 } catch (e) {
-                    console.log(e);
+                    log.debug(e.message);
                     return null;
                 }
                 try {
                     unstakeTokenAccountBalance =
                         await connection.getTokenAccountBalance(unstakeAccount);
                 } catch (e) {
-                    console.log(e);
+                    log.debug(e.message);
                     return null;
                 }
                 return {
@@ -1191,9 +1219,10 @@ programCommand("claim-stake")
         accountFetchSpinner.succeed();
 
         if (formattedAccounts.length === 0) {
-            return log.error(
+            log.error(
                 "You don't have any storage accounts with claimable stake."
             );
+            return process.exit(0);
         }
 
         const pickedAccount = await prompts({
@@ -1214,9 +1243,8 @@ programCommand("claim-stake")
         });
 
         if (typeof pickedAccount.option === "undefined") {
-            return log.error(
-                "You must pick a storage account to reduce storage on."
-            );
+            log.error("You must pick a storage account to reduce storage on.");
+            return process.exit(0);
         }
         // Get current storage and user funds
         const storageAccount = formattedAccounts[pickedAccount.option].pubkey;
@@ -1226,9 +1254,10 @@ programCommand("claim-stake")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         const txnSpinner = ora(
             "Sending claim stake transaction request. Subject to solana traffic conditions (w/ 120s timeout)."
@@ -1239,15 +1268,14 @@ programCommand("claim-stake")
             txnSpinner.succeed(
                 `You have claimed ${formattedAccount.unstakeTokenAccountBalance.value.uiAmount} $SHDW from your storage account ${storageAccount}.`
             );
-            return;
+            return process.exit(0);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. See below for details:"
             );
             log.error(e.message);
-            return;
+            return process.exit(0);
         }
-        return;
     });
 programCommand("refresh-stake")
     .requiredOption(
@@ -1264,9 +1292,10 @@ programCommand("refresh-stake")
         const userInfo = drive.userInfo;
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
         let rawAccounts = await drive.getStorageAccounts();
         let [formattedAccounts] = await getFormattedStorageAccounts(
@@ -1292,7 +1321,7 @@ programCommand("refresh-stake")
 
         if (typeof pickedAccount.option === "undefined") {
             log.error("You must pick a storage account to refresh.");
-            return;
+            return process.exit(0);
         }
 
         const storageAccount = formattedAccounts[pickedAccount.option].pubkey;
@@ -1302,9 +1331,10 @@ programCommand("refresh-stake")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         log.info(`Picked account ${storageAccount}`);
         const txnSpinner = ora(
@@ -1316,13 +1346,13 @@ programCommand("refresh-stake")
             txnSpinner.succeed(
                 `You have refreshed stake for storage account ${storageAccount}.`
             );
-            return;
+            return process.exit(0);
         } catch (e: any) {
             txnSpinner.fail(
                 "Error sending transaction. See below for details:"
             );
             log.error(e.message);
-            return;
+            return process.exit(0);
         }
     });
 programCommand("top-up")
@@ -1344,9 +1374,10 @@ programCommand("top-up")
         const userInfo = drive.userInfo;
         const userInfoAccount = await UserInfo.fetch(connection, userInfo);
         if (userInfoAccount === null) {
-            return log.error(
+            log.error(
                 "You have not created a storage account on Shadow Drive yet. Please see the 'create-storage-account' command to get started."
             );
+            return process.exit(0);
         }
 
         let rawAccounts = await drive.getStorageAccounts();
@@ -1373,7 +1404,7 @@ programCommand("top-up")
 
         if (typeof pickedAccount.option === "undefined") {
             log.error("You must pick a storage account to top up.");
-            return;
+            return process.exit(0);
         }
 
         const storageAccount = formattedAccounts[pickedAccount.option].pubkey;
@@ -1383,9 +1414,10 @@ programCommand("top-up")
             connection
         );
         if (!storageAccountType || storageAccountType === null) {
-            return log.error(
+            log.error(
                 `Storage account ${storageAccount.toString()} is not a valid Shadow Drive Storage Account.`
             );
+            return process.exit(0);
         }
         log.info(`Picked account ${storageAccount}`);
         const txnSpinner = ora(
@@ -1400,13 +1432,13 @@ programCommand("top-up")
             txnSpinner.succeed(
                 `You have added stake for storage account ${storageAccount}.`
             );
-            return;
+            return process.exit(0);
         } catch (e) {
             txnSpinner.fail(
                 "Error sending transaction. See below for details:"
             );
             log.error(e.message);
-            return;
+            return process.exit(0);
         }
     });
 function programCommand(name: string) {

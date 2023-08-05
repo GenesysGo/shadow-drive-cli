@@ -1,6 +1,6 @@
 {
     "name": "@shadow-drive/cli",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "main": "shdw-drive.js",
     "bin": {
         "shdw-drive": "./dist/shdw-drive.js"
@@ -14,7 +14,7 @@
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.27.0",
-        "@shadow-drive/sdk": "^4.0.3",
+        "@shadow-drive/sdk": "^5.0.0",
         "@solana/spl-token": "^0.2.0",
         "@solana/web3.js": "^1.41.0",
         "bigint-conversion": "^2.2.1",
