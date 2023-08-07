@@ -548,7 +548,6 @@ programCommand("upload-multiple-files")
     )
     .action(async (options, cmd) => {
         await handleUpload(options, cmd, "directory");
-        return process.exit(0);
     });
 
 programCommand("delete-file")
