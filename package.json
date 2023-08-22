@@ -3,14 +3,16 @@
     "version": "0.6.0",
     "main": "shdw-drive.js",
     "bin": {
-        "shdw-drive": "./dist/shdw-drive.js"
+        "shdw-drive": "./dist/src/shdw-drive.js"
     },
     "license": "MIT",
     "publishConfig": {
         "access": "public"
     },
     "scripts": {
-        "build": "tsc"
+        "clean": "rimraf dist",
+        "build": "npm run clean && tsc",
+        "prepublish": "build"
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.27.0",
@@ -37,6 +39,7 @@
         "@types/node-fetch": "^2.6.1",
         "@types/prompts": "^2.0.14",
         "@types/typescript": "^2.0.0",
-        "pkg": "^5.6.0"
+        "pkg": "^5.6.0",
+        "rimraf": "^5.0.1"
     }
 }

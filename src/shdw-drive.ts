@@ -23,8 +23,9 @@ import cliProgress from "cli-progress";
 import { ShadowDriveResponse, ShdwDrive, UserInfo } from "@shadow-drive/sdk";
 import { from, map, mergeMap, tap, toArray } from "rxjs";
 import mime from "mime-types";
+import { version } from "../package.json";
 
-program.version("0.5.0");
+program.version(version);
 program.description(
     "CLI for interacting with Shade Drive. This tool uses Solana's Mainnet-Beta network with an internal RPC configuration. It does not use your local Solana configurations."
 );
