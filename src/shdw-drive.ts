@@ -333,9 +333,9 @@ async function handleUpload(
         const fileExtension = fileName.substring(fileName.lastIndexOf(".") + 1);
         const fileContentType = mime.lookup(fileExtension);
         const size = new anchor.BN(fileStats.size);
-        const url = encodeURI(
-            `https://shdw-drive.genesysgo.net/{replace}/${fileName}`
-        );
+        const url = `https://shdw-drive.genesysgo.net/{replace}/${encodeURIComponent(
+            fileName
+        )}`;
         tmpFileData.push({
             location: filePath,
             fileName: fileName,
@@ -416,7 +416,7 @@ async function handleUpload(
     }
 
     tmpFileData.forEach((file: any) => {
-        file.url = file.url.replace("%7Breplace%7D", storageAccount.toString());
+        file.url = file.url.replace("{replace}", storageAccount.toString());
     });
 
     // create new progress bar
