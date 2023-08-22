@@ -17,6 +17,7 @@ import { Program } from "@coral-xyz/anchor";
 import { SHDW_DRIVE_ENDPOINT, programId } from "../constants";
 import fetch from "node-fetch";
 import Bottleneck from "bottleneck";
+import { StorageAccount, StorageAccountV2 } from "@shadow-drive/sdk";
 
 export function loadWalletKey(keypair: string): Keypair {
     if (!keypair || keypair == "") {
@@ -115,32 +116,21 @@ export function bytesToHuman(bytes: any, si = false, dp = 1) {
  * @returns
  */
 export async function getFormattedStorageAccounts(
-    key: anchor.web3.PublicKey,
-    totalAccounts: number
+    rawAccounts: Array<{
+        publicKey: anchor.web3.PublicKey;
+        account: StorageAccountV2;
+    }>
 ): Promise<[Array<any>, Array<anchor.web3.PublicKey>]> {
     const limiter = new Bottleneck({
         minTime: 50,
         maxConcurrent: 10,
     });
-    let accountsToFetch: anchor.web3.PublicKey[] = [];
-
-    for (let i = 0; i <= totalAccounts; i++) {
-        let [acc] = await anchor.web3.PublicKey.findProgramAddress(
-            [
-                Buffer.from("storage-account"),
-                key.toBytes(),
-                new anchor.BN(i).toTwos(0).toArrayLike(Buffer, "le", 4),
-            ],
-            programId
-        );
-        accountsToFetch.push(acc);
-    }
-
-    log.debug(`Accounts to Fetch length: ${accountsToFetch.length}`);
+    let accountKeys = [...rawAccounts.map((account) => account.publicKey)];
+    log.debug(`Accounts to Fetch length: ${rawAccounts.length}`);
     let accounts: any = [];
 
     await Promise.all(
-        accountsToFetch.map(async (account) => {
+        accountKeys.map(async (account) => {
             try {
                 const storageAccountDetails = await limiter.schedule(() =>
                     fetch(`${SHDW_DRIVE_ENDPOINT}/storage-account-info`, {
@@ -202,7 +192,7 @@ export async function getFormattedStorageAccounts(
             return acc;
         }
     });
-    return [formattedAccounts, accountsToFetch];
+    return [formattedAccounts, accountKeys];
 }
 export function getAnchorEnvironment(
     keypair: anchor.web3.Keypair,

@@ -1,27 +1,29 @@
 {
     "name": "@shadow-drive/cli",
-    "version": "0.5.3",
+    "version": "0.6.0",
     "main": "shdw-drive.js",
     "bin": {
-        "shdw-drive": "./dist/shdw-drive.js"
+        "shdw-drive": "./dist/src/shdw-drive.js"
     },
     "license": "MIT",
     "publishConfig": {
         "access": "public"
     },
     "scripts": {
-        "build": "tsc"
+        "clean": "rimraf dist",
+        "build": "npm run clean && tsc",
+        "prepublishOnly": "npm run build"
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.27.0",
-        "@shadow-drive/sdk": "^4.0.2",
+        "@shadow-drive/sdk": "^5.0.0",
         "@solana/spl-token": "^0.2.0",
         "@solana/web3.js": "^1.41.0",
         "bigint-conversion": "^2.2.1",
         "bottleneck": "^2.19.5",
         "bs58": "^5.0.0",
         "cli-progress": "^3.11.2",
-        "commander": "^9.2.0",
+        "commander": "^11.0.0",
         "form-data": "^4.0.0",
         "loglevel": "^1.8.0",
         "mime-types": "^2.1.35",
@@ -37,6 +39,7 @@
         "@types/node-fetch": "^2.6.1",
         "@types/prompts": "^2.0.14",
         "@types/typescript": "^2.0.0",
-        "pkg": "^5.6.0"
+        "pkg": "^5.6.0",
+        "rimraf": "^5.0.1"
     }
 }
