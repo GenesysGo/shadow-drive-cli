@@ -16,7 +16,7 @@
     },
     "dependencies": {
         "@coral-xyz/anchor": "^0.27.0",
-        "@shadow-drive/sdk": "^5.1.0",
+        "@shadow-drive/sdk": "^5.1.1",
         "@solana/spl-token": "^0.2.0",
         "@solana/web3.js": "^1.41.0",
         "bigint-conversion": "^2.2.1",
