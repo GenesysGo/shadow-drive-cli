@@ -24,6 +24,8 @@ import { ShadowDriveResponse, ShdwDrive, UserInfo } from "@shadow-drive/sdk";
 import { from, map, mergeMap, tap, toArray } from "rxjs";
 import mime from "mime-types";
 import { version } from "../package.json";
+import process from "process";
+process.removeAllListeners("warning");
 
 program.version(version);
 program.description(
