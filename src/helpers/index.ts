@@ -15,7 +15,7 @@ import {
 } from "../types/shadow_drive_user_staking";
 import { Program } from "@coral-xyz/anchor";
 import { SHDW_DRIVE_ENDPOINT, programId } from "../constants";
-import fetch from "node-fetch";
+import fetch from "cross-fetch";
 import Bottleneck from "bottleneck";
 import { StorageAccount, StorageAccountV2 } from "@shadow-drive/sdk";
 
