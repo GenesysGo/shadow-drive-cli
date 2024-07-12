@@ -278,18 +278,14 @@ programCommand("edit-file")
             `Sending file edit request to the cluster.`
         ).start();
         try {
-            const uploadResponse = await drive.editFile(
-                storageAccount,
-                options.url,
-                {
-                    name: fileName,
-                    file: fileData,
-                }
-            );
+            const uploadResponse = await drive.editFile(storageAccount, {
+                name: fileName,
+                file: fileData,
+            });
             txnSpinner.succeed(`File account updated: ${fileName}`);
             log.info(
                 "Your finalized file location:",
-                uploadResponse.finalized_location
+                uploadResponse.finalized_locations
             );
             log.info("Your updated file is immediately accessible.");
             return process.exit(0);
@@ -513,6 +509,7 @@ async function handleUpload(
                         storageAccount,
                         fileDataChunk,
                         concurrent,
+                        false,
                         (items: number) => progress.increment(items)
                     );
                     return uploadResponse;
